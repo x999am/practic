@@ -1,1 +1,60 @@
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from .models import Order, OrderItem
+import json
+
+@csrf_exempt
+def create_order(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_id = data.get('user_id')
+            total_price = data.get('total_price')
+            items = data.get('items')
+
+            if not user_id or not total_price or not items:
+                return JsonResponse({'status': 'error', 'message': 'Invalid input data'}, status=400)
+
+            order = Order.objects.create(user_id=user_id, total_price=total_price, status='created')
+            for item in items:
+                OrderItem.objects.create(order=order, product_id=item['product_id'], quantity=item['quantity'], price=item['price'])
+
+            return JsonResponse({'status': 'success', 'order_id': order.id}, status=201)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON format'}, status=400)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def update_order(request, order_id):
+    if request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            order = Order.objects.get(id=order_id)
+
+            status = data.get('status')
+            if status:
+                order.status = status
+                order.save()
+
+            return JsonResponse({'status': 'success', 'message': 'Order updated successfully'})
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON format'}, status=400)
+        except Order.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Order not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@csrf_exempt
+def cancel_order(request, order_id):
+    if request.method == 'DELETE':
+        try:
+            order = Order.objects.get(id=order_id)
+            order.status = 'canceled'
+            order.save()
+            return JsonResponse({'status': 'success', 'message': 'Order canceled successfully'})
+        except Order.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'Order not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
